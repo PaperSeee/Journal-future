@@ -1,0 +1,107 @@
+// HqGambler — Prisma schema
+// Target: PostgreSQL (Neon). For local SQLite dev, switch provider to "sqlite"
+// and replace the `String[]` tags field per the README (SQLite has no arrays).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trade {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  date      DateTime
+
+  instrument Instrument
+  direction  Direction
+
+  // ── Contexte HTF (modèle 2-imbalances) ──
+  htfBias         String // le draw : où le prix veut livrer
+  entryPoiType    PoiType
+  entryPoi        String // ex: "H1 11835-11858"
+  targetZone      String // la zone cible opposée
+  tapTimeUtc      String? // "HH:MM" UTC
+  session         Session? // dérivé de tapTimeUtc
+  poiSize         PoiSize
+  reactionQuality Reaction
+  noWick          Boolean    @default(false)
+
+  // ── Exécution ──
+  entryPrice  Float?
+  stopPrice   Float?
+  targetPrice Float?
+  rrPlanned   Float? // |target-entry| / |entry-stop|
+  result      Result
+  rRealized   Float? // R signé (+2.5 / -1 / 0)
+
+  // ── Discipline & psychologie ──
+  followedPlan  Boolean    @default(true)
+  sentimentPre  Sentiment?
+  sentimentPost Sentiment?
+  note          String?
+  screenshotUrl String? // base64 data-URL (compressed) or external URL
+  tags          String[]
+
+  @@index([date])
+  @@index([instrument])
+  @@index([session])
+  @@index([result])
+}
+
+enum Instrument {
+  MNQ
+  MGC
+  OTHER
+}
+
+enum Direction {
+  LONG
+  SHORT
+}
+
+enum PoiType {
+  IMBALANCE
+  GAP
+  DEVIL_MARK
+}
+
+enum PoiSize {
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum Reaction {
+  CLEAN
+  WEAK
+  FORCED
+}
+
+enum Result {
+  WIN
+  LOSS
+  BE
+}
+
+enum Session {
+  OVERNIGHT
+  LONDON
+  NY
+  POST_NY
+}
+
+enum Sentiment {
+  CALM
+  CONFIDENT
+  NEUTRAL
+  FOMO
+  ANXIOUS
+  REVENGE
+  TILTED
+  HESITANT
+}

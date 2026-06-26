@@ -1,0 +1,22 @@
+{
+  "name": "HqGambler — Journal & Plan de Trading",
+  "short_name": "HqGambler",
+  "description": "Journal de trading discrétionnaire futures (MNQ / MGC). Modèle delivery entre imbalances HTF.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0A0C10",
+  "theme_color": "#0A0C10",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Nouveau trade", "short_name": "Nouveau", "url": "/journal/new" },
+    { "name": "Plan & checklist", "short_name": "Plan", "url": "/plan" }
+  ]
+}

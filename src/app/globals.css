@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    @apply bg-bg text-ink antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-image:
+      radial-gradient(1200px 600px at 80% -10%, rgba(78, 168, 222, 0.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(46, 111, 158, 0.05), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(78, 168, 222, 0.3);
+    color: #fff;
+  }
+
+  /* Numeric figures should always be tabular + mono where it matters. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Slim scrollbar in the dark theme. */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #242a34;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #313a47;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-border bg-panel shadow-card;
+  }
+
+  .panel-soft {
+    @apply rounded-xl border border-border-soft bg-panel-soft;
+  }
+
+  .label {
+    @apply text-xs font-medium uppercase tracking-wider text-ink-dim;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-border bg-bg-soft px-3 py-2.5 text-sm text-ink
+      placeholder:text-ink-dim outline-none transition
+      focus:border-accent/60 focus:ring-2 focus:ring-accent/20;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm
+      font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-bg shadow-glow hover:bg-accent-bright;
+  }
+  .btn-ghost {
+    @apply btn border border-border bg-panel-soft text-ink hover:bg-panel-hover;
+  }
+  .btn-danger {
+    @apply btn border border-loss/40 bg-loss/10 text-loss hover:bg-loss/20;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-panel-soft
+      px-2.5 py-1 text-xs font-medium text-ink-soft;
+  }
+
+  .stat-value {
+    @apply font-mono text-2xl font-semibold tabular sm:text-3xl;
+  }
+}
+
+/* Recharts tooltip + grid tweaks for the dark theme. */
+.recharts-default-tooltip {
+  background: #13161c !important;
+  border: 1px solid #242a34 !important;
+  border-radius: 10px !important;
+}
+.recharts-cartesian-grid line {
+  stroke: #1b2029;
+}
