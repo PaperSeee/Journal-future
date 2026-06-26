@@ -2,9 +2,9 @@
 
 export const MODEL_NAME = "Delivery entre imbalances HTF — entrée sur réaction";
 
-export const MODEL_DESCRIPTION = `Le setup = 2 zones HTF. Le prix livre d'une zone HTF (H4) vers une autre (H1) : l'une est la cible, l'autre l'entrée. Le POI d'entrée peut être une imbalance, un gap, ou un devil's mark. Condition de validité = alignement : en réagissant, le POI d'entrée doit envoyer le prix vers la cible.
+export const MODEL_DESCRIPTION = `Le setup = 2 zones HTF. Le prix livre d'une zone HTF (H4) vers une autre (H1) : l'une est la cible, l'autre l'entrée. Condition de validité = alignement : en réagissant, le POI d'entrée doit envoyer le prix vers la cible.
 
-Entrée : tap + réaction → marché, jugée en M15 max (jamais en dessous). Réaction de qualité = bougie franche, idéalement sans mèche (no-wick) dans le sens du trade.`;
+Entrée sur FVG obligatoire — le prix tape la FVG et réagit. Entrée au marché sur la réaction, jugée en M15 max (jamais en dessous). SL au-dessus / en-dessous de la FVG = mon 1R. Pas de trade après 21h.`;
 
 export interface ChecklistItem {
   id: string;
@@ -26,8 +26,8 @@ export const CHECKLIST: ChecklistItem[] = [
   },
   {
     id: "reaction",
-    title: "Le prix tape mon POI et RÉAGIT",
-    detail: "Bougie franche, idéalement sans mèche.",
+    title: "Entrée sur FVG OBLIGATOIRE",
+    detail: "Le prix tape la FVG et réagit (bougie franche, idéalement sans mèche).",
   },
   {
     id: "entry",
@@ -36,7 +36,7 @@ export const CHECKLIST: ChecklistItem[] = [
   },
   {
     id: "stop",
-    title: "Stop au-delà du POI d'entrée = 1R",
+    title: "SL au-dessus / en-dessous de la FVG = 1R",
     detail: "Grosse zone → raffiner.",
   },
   {
@@ -52,17 +52,19 @@ export const CHECKLIST: ChecklistItem[] = [
   },
   {
     id: "noclose",
-    title: "Pas dans les 2h avant la close NY",
-    detail: "Rien après ~14:00 ET / 20:00 Bruxelles.",
+    title: "Pas de trade après 21h",
+    detail: "Rien après 21h.",
   },
 ];
 
 export const VALID_LOSS = `Un SL qui respecte les 8 points n'est pas une erreur. Le modèle perd ~1 fois sur 2 et reste gagnant grâce au RR. Pas de doute, pas de revenge, ne rien changer.`;
 
 export const NON_NEGOTIABLES: string[] = [
-  "1 trade par POI (zéro revenge sur un niveau échoué)",
-  "Pas de trade 2h avant la close",
+  "Entrée sur FVG obligatoire (pas de FVG = pas de trade)",
   "Entrée M15 max",
+  "SL au-dessus / en-dessous de la FVG",
+  "Pas de trade après 21h",
+  "1 trade par POI (zéro revenge sur un niveau échoué)",
   "Risque 0,5% fixe (micros MGC / MNQ)",
   "Pas de réaction = pas de trade",
   "Journaliser chaque trade",
