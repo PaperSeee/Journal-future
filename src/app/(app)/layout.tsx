@@ -1,18 +1,13 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
 import { Providers } from "@/components/Providers";
 import { ToastProvider } from "@/components/Toast";
 import { Sidebar, MobileTabBar, MobileHeader } from "@/components/Nav";
 
-export default async function AppLayout({
+// Auth temporairement désactivée — accès direct sans login.
+export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
-
   return (
     <Providers>
       <ToastProvider>

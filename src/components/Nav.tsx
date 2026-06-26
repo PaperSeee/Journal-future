@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import { Logo } from "./Logo";
 
 const NAV = [
@@ -56,14 +55,6 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      <button
-        onClick={() => signOut({ callbackUrl: "/login" })}
-        className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-dim transition hover:bg-panel-hover hover:text-loss"
-      >
-        <LogoutIcon className="h-[18px] w-[18px]" />
-        Déconnexion
-      </button>
     </aside>
   );
 }
@@ -101,13 +92,6 @@ export function MobileHeader() {
           HqGambler
         </span>
       </Link>
-      <button
-        onClick={() => signOut({ callbackUrl: "/login" })}
-        className="text-ink-dim transition hover:text-loss"
-        aria-label="Déconnexion"
-      >
-        <LogoutIcon className="h-5 w-5" />
-      </button>
     </header>
   );
 }
@@ -144,14 +128,6 @@ function PlanIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 11l2 2 4-4" />
       <rect x="3" y="3" width="18" height="18" rx="2" />
-    </svg>
-  );
-}
-function LogoutIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <path d="M16 17l5-5-5-5M21 12H9" />
     </svg>
   );
 }

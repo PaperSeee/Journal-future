@@ -1,8 +1,10 @@
-export { default } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
-// Protect everything except the login page, auth API, and static/PWA assets.
+// Auth temporairement désactivée — le middleware ne protège plus rien.
+export function middleware() {
+  return NextResponse.next();
+}
+
 export const config = {
-  matcher: [
-    "/((?!login|api/auth|_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|sw.js|robots.txt).*)",
-  ],
+  matcher: [],
 };

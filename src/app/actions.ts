@@ -1,9 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   computeRrPlanned,
@@ -12,9 +10,9 @@ import {
 import { parseTradeForm, tradeInputSchema, type TradeInput } from "@/lib/validation";
 import { isLegacyArray, mapLegacyTrade } from "@/lib/legacy";
 
+// Auth temporairement désactivée — no-op.
 async function requireAuth() {
-  const session = await getServerSession(authOptions);
-  if (!session) throw new Error("Non autorisé");
+  /* auth disabled */
 }
 
 export interface ActionResult {
