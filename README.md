@@ -86,10 +86,20 @@ Variables nécessaires :
 ## ☁️ Déploiement Vercel
 
 1. Pousse le repo sur GitHub, importe-le dans Vercel.
-2. Renseigne **toutes** les variables d'env ci-dessus dans Vercel (Production + Preview).
-3. Le `build` lance automatiquement `prisma generate && prisma migrate deploy && next build`
-   → les migrations sont appliquées au déploiement. Assure-toi que `DATABASE_URL` pointe sur Neon.
-4. Déploie. Sur mobile : ouvre l'URL → **Ajouter à l'écran d'accueil** pour installer la PWA.
+2. Renseigne `DATABASE_URL` dans Vercel (Production + Preview).
+3. Le `build` Vercel fait `prisma generate && next build` — **il n'applique pas les migrations**
+   (le pooler Neon ne supporte pas le verrou d'avis de `migrate deploy` → timeout P1002).
+4. **Applique les migrations à part**, depuis ton laptop, avec la connexion **directe** Neon
+   (URL *sans* `-pooler`, l'option "Direct connection" dans Neon) :
+   ```bash
+   DATABASE_URL="postgresql://...neon.tech/neondb?sslmode=require" npm run db:deploy
+   ```
+   À refaire uniquement quand tu ajoutes une nouvelle migration.
+5. Déploie. Sur mobile : ouvre l'URL → **Ajouter à l'écran d'accueil** pour installer la PWA.
+
+> Note auth : l'authentification est actuellement **désactivée** (accès direct). Seule
+> `DATABASE_URL` est requise. Pour réactiver le login plus tard, rebranche le middleware,
+> le check de session dans `(app)/layout.tsx`, et les variables `NEXTAUTH_*` / `APP_USER_*`.
 
 ---
 
