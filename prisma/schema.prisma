@@ -20,16 +20,25 @@ model Trade {
   instrument Instrument
   direction  Direction
 
-  // ── Contexte HTF (modèle 2-imbalances) ──
-  htfBias         String // le draw : où le prix veut livrer
-  entryPoiType    PoiType
-  entryPoi        String // ex: "H1 11835-11858"
-  targetZone      String // la zone cible opposée
+  // Quelle stratégie a produit ce trade (pilote quels champs sont pertinents).
+  strategy   Strategy   @default(HTF_IMBALANCE)
+
+  // ── Contexte HTF (modèle 2-imbalances) — optionnel si strategy = IB ──
+  htfBias         String? // le draw : où le prix veut livrer
+  entryPoiType    PoiType?
+  entryPoi        String? // ex: "H1 11835-11858"
+  targetZone      String? // la zone cible opposée
   tapTimeUtc      String? // "HH:MM" UTC
   session         Session? // dérivé de tapTimeUtc
-  poiSize         PoiSize
-  reactionQuality Reaction
+  poiSize         PoiSize?
+  reactionQuality Reaction?
   noWick          Boolean    @default(false)
+
+  // ── Contexte IB (Initial Balance) — optionnel si strategy = HTF ──
+  ibSession   IbSession? // ASIA / LONDON / NEW_YORK
+  ibDirection IbDirection? // biais de l'IB : haussier / baissier
+  ibEntryTiming IbEntryTiming? // avant la fin de l'IB / après clôture de l'IB
+  ibFvg       IbFvg?     // entrée sur FVG M5 / M15 / aucune
 
   // ── Exécution ──
   entryPrice  Float?
@@ -62,6 +71,33 @@ enum Instrument {
 enum Direction {
   LONG
   SHORT
+}
+
+enum Strategy {
+  HTF_IMBALANCE
+  IB
+}
+
+enum IbSession {
+  ASIA
+  LONDON
+  NEW_YORK
+}
+
+enum IbDirection {
+  BULLISH
+  BEARISH
+}
+
+enum IbEntryTiming {
+  BEFORE_IB_CLOSE // entrée avant la fin de l'IB
+  AFTER_IB_CLOSE // on attend que l'IB se termine
+}
+
+enum IbFvg {
+  NONE
+  M5
+  M15
 }
 
 enum PoiType {
