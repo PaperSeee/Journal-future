@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DIRECTIONS,
   INSTRUMENTS,
   LABELS,
   POI_SIZES,
-  POI_TYPES,
   REACTIONS,
   RESULTS,
   SENTIMENTS,
+  IB_SESSIONS,
+  IB_FVGS,
   computeRrPlanned,
   defaultRealizedR,
   sessionFromTapTime,
@@ -19,13 +20,14 @@ import {
 import { createTrade, updateTrade, type ActionResult } from "@/app/actions";
 import { compressImage } from "@/lib/image";
 import { useToast } from "@/components/Toast";
-import { Field, Segmented, Select, Toggle } from "@/components/form/Fields";
+import { Collapsible, Field, Segmented, Select, Toggle } from "@/components/form/Fields";
 
 export interface TradeFormValues {
   id?: string;
   date: string; // yyyy-mm-dd
   instrument: string;
   direction: string;
+  strategy: string;
   htfBias: string;
   entryPoiType: string;
   entryPoi: string;
@@ -34,6 +36,10 @@ export interface TradeFormValues {
   poiSize: string;
   reactionQuality: string;
   noWick: boolean;
+  ibSession: string;
+  ibDirection: string;
+  ibEntryTiming: string;
+  ibFvg: string;
   entryPrice: string;
   stopPrice: string;
   targetPrice: string;
@@ -51,6 +57,7 @@ const EMPTY: TradeFormValues = {
   date: new Date().toISOString().slice(0, 10),
   instrument: "MNQ",
   direction: "LONG",
+  strategy: "HTF_IMBALANCE",
   htfBias: "",
   entryPoiType: "IMBALANCE",
   entryPoi: "",
@@ -59,6 +66,10 @@ const EMPTY: TradeFormValues = {
   poiSize: "MEDIUM",
   reactionQuality: "CLEAN",
   noWick: false,
+  ibSession: "LONDON",
+  ibDirection: "BULLISH",
+  ibEntryTiming: "AFTER_IB_CLOSE",
+  ibFvg: "M5",
   entryPrice: "",
   stopPrice: "",
   targetPrice: "",
@@ -71,6 +82,43 @@ const EMPTY: TradeFormValues = {
   screenshotUrl: "",
   tags: "",
 };
+
+// Context fields worth remembering between two trades logged back-to-back
+// (same daily bias / same imbalance family) — the biggest source of repetitive typing.
+const CONTEXT_KEYS = [
+  "strategy",
+  "htfBias",
+  "entryPoiType",
+  "entryPoi",
+  "targetZone",
+  "poiSize",
+  "reactionQuality",
+  "noWick",
+  "ibSession",
+  "ibDirection",
+  "ibEntryTiming",
+  "ibFvg",
+] as const;
+const LAST_CONTEXT_KEY = "mercure:lastTradeContext";
+
+function saveLastContext(v: TradeFormValues) {
+  try {
+    const ctx: Record<string, unknown> = {};
+    for (const k of CONTEXT_KEYS) ctx[k] = v[k];
+    localStorage.setItem(LAST_CONTEXT_KEY, JSON.stringify(ctx));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadLastContext(): Partial<TradeFormValues> | null {
+  try {
+    const raw = localStorage.getItem(LAST_CONTEXT_KEY);
+    return raw ? (JSON.parse(raw) as Partial<TradeFormValues>) : null;
+  } catch {
+    return null;
+  }
+}
 
 const opts = <T extends string>(arr: readonly T[], labels: Record<T, string>) =>
   arr.map((v) => ({ value: v, label: labels[v] }));
@@ -88,9 +136,33 @@ export function TradeForm({
   const [v, setV] = useState<TradeFormValues>({ ...EMPTY, ...initial });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
+  const [hasLastContext, setHasLastContext] = useState(false);
+
+  useEffect(() => {
+    if (mode === "create") setHasLastContext(loadLastContext() != null);
+  }, [mode]);
+
+  // Keyboard shortcut: Cmd/Ctrl+Enter submits from anywhere in the form.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("trade-form-submit")?.click();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const set = <K extends keyof TradeFormValues>(k: K, val: TradeFormValues[K]) =>
     setV((prev) => ({ ...prev, [k]: val }));
+
+  function applyLastContext() {
+    const ctx = loadLastContext();
+    if (!ctx) return;
+    setV((prev) => ({ ...prev, ...ctx }));
+    toast.push("Contexte du dernier trade réappliqué", "info");
+  }
 
   // Live planned RR.
   const rrPlanned = useMemo(
@@ -104,6 +176,7 @@ export function TradeForm({
   );
 
   const session = sessionFromTapTime(v.tapTimeUtc);
+  const isIb = v.strategy === "IB";
 
   // When result changes, prefill realized R per the rules (LOSS → -1, BE → 0).
   function onResultChange(result: string) {
@@ -145,14 +218,21 @@ export function TradeForm({
     fd.set("date", v.date);
     fd.set("instrument", v.instrument);
     fd.set("direction", v.direction);
-    fd.set("htfBias", v.htfBias);
-    fd.set("entryPoiType", v.entryPoiType);
-    fd.set("entryPoi", v.entryPoi);
-    fd.set("targetZone", v.targetZone);
+    fd.set("strategy", v.strategy);
+    const isIb = v.strategy === "IB";
+    // On n'envoie les champs d'une stratégie que si elle est active (les autres → vides).
+    fd.set("htfBias", isIb ? "" : v.htfBias);
+    fd.set("entryPoiType", isIb ? "" : v.entryPoiType);
+    fd.set("entryPoi", isIb ? "" : v.entryPoi);
+    fd.set("targetZone", isIb ? "" : v.targetZone);
     fd.set("tapTimeUtc", v.tapTimeUtc);
-    fd.set("poiSize", v.poiSize);
-    fd.set("reactionQuality", v.reactionQuality);
+    fd.set("poiSize", isIb ? "" : v.poiSize);
+    fd.set("reactionQuality", isIb ? "" : v.reactionQuality);
     fd.set("noWick", v.noWick ? "on" : "");
+    fd.set("ibSession", isIb ? v.ibSession : "");
+    fd.set("ibDirection", isIb ? v.ibDirection : "");
+    fd.set("ibEntryTiming", isIb ? v.ibEntryTiming : "");
+    fd.set("ibFvg", isIb ? v.ibFvg : "");
     fd.set("entryPrice", v.entryPrice);
     fd.set("stopPrice", v.stopPrice);
     fd.set("targetPrice", v.targetPrice);
@@ -179,6 +259,7 @@ export function TradeForm({
         res = await createTrade(fd);
       }
       if (res.ok) {
+        saveLastContext(v);
         toast.push(
           mode === "edit" ? "Trade mis à jour" : "Trade enregistré",
           "success",
@@ -195,12 +276,28 @@ export function TradeForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      {/* ── Contexte ── */}
+    <form onSubmit={onSubmit} className="space-y-4">
+      {/* ── Essentiel — encodage rapide ── */}
       <section className="panel space-y-4 p-5">
-        <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-ink-soft">
-          Contexte
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-ink-soft">
+            Essentiel
+          </h2>
+          <span className="hidden text-[11px] text-ink-dim sm:inline">⌘/Ctrl + Entrée pour enregistrer</span>
+        </div>
+
+        <Field label="Stratégie" hint="pilote les champs de contexte">
+          <Segmented
+            name="strategy"
+            value={v.strategy}
+            onChange={(val) => set("strategy", val)}
+            options={[
+              { value: "HTF_IMBALANCE", label: "HTF — Imbalances" },
+              { value: "IB", label: "IB — Initial Balance" },
+            ]}
+          />
+        </Field>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Date" htmlFor="date" error={errors.date}>
             <input
@@ -211,7 +308,7 @@ export function TradeForm({
               onChange={(e) => set("date", e.target.value)}
             />
           </Field>
-          <Field label="Heure du tap (UTC)" htmlFor="tap" hint={session ? LABELS.session[session] : "HH:MM"} error={errors.tapTimeUtc}>
+          <Field label="Heure du tap (UTC+2)" htmlFor="tap" hint={session ? LABELS.session[session] : "HH:MM"} error={errors.tapTimeUtc}>
             <input
               id="tap"
               type="text"
@@ -246,107 +343,6 @@ export function TradeForm({
           </Field>
         </div>
 
-        <Field label="Biais HTF — le draw (où le prix veut livrer)" htmlFor="bias" error={errors.htfBias}>
-          <input
-            id="bias"
-            className="input"
-            placeholder="ex: livraison vers H4 sell-side 11700"
-            value={v.htfBias}
-            onChange={(e) => set("htfBias", e.target.value)}
-          />
-        </Field>
-      </section>
-
-      {/* ── Setup (2 zones) ── */}
-      <section className="panel space-y-4 p-5">
-        <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-ink-soft">
-          Setup — 2 zones
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Type de POI d'entrée">
-            <Select
-              name="entryPoiType"
-              value={v.entryPoiType}
-              onChange={(e) => set("entryPoiType", e.target.value)}
-              options={opts(POI_TYPES, LABELS.poiType)}
-            />
-          </Field>
-          <Field label="Taille du POI">
-            <Segmented
-              name="poiSize"
-              value={v.poiSize}
-              onChange={(val) => set("poiSize", val)}
-              options={POI_SIZES.map((s) => ({ value: s, label: LABELS.poiSize[s] }))}
-            />
-          </Field>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="POI d'entrée" htmlFor="ein" error={errors.entryPoi}>
-            <input
-              id="ein"
-              className="input"
-              placeholder="H1 11835-11858"
-              value={v.entryPoi}
-              onChange={(e) => set("entryPoi", e.target.value)}
-            />
-          </Field>
-          <Field label="Zone cible (opposée)" htmlFor="cib" error={errors.targetZone}>
-            <input
-              id="cib"
-              className="input"
-              placeholder="H4 11700-11720"
-              value={v.targetZone}
-              onChange={(e) => set("targetZone", e.target.value)}
-            />
-          </Field>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Qualité de la réaction">
-            <Segmented
-              name="reactionQuality"
-              value={v.reactionQuality}
-              onChange={(val) => set("reactionQuality", val)}
-              options={[
-                { value: "CLEAN", label: "Clean", tone: "win" },
-                { value: "WEAK", label: "Faible", tone: "be" },
-                { value: "FORCED", label: "Forcée", tone: "loss" },
-              ]}
-            />
-          </Field>
-          <Toggle
-            name="noWick"
-            checked={v.noWick}
-            onChange={(val) => set("noWick", val)}
-            label="Bougie sans mèche"
-            description="No-wick dans le sens du trade"
-          />
-        </div>
-      </section>
-
-      {/* ── Exécution ── */}
-      <section className="panel space-y-4 p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-ink-soft">
-            Exécution
-          </h2>
-          <div className="chip">
-            RR planifié
-            <span className="font-mono font-semibold text-accent">
-              {rrPlanned != null ? `${rrPlanned.toFixed(2)}` : "—"}
-            </span>
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Entrée" htmlFor="entry">
-            <input id="entry" type="number" step="any" className="input font-mono" value={v.entryPrice} onChange={(e) => set("entryPrice", e.target.value)} />
-          </Field>
-          <Field label="Stop" htmlFor="stop">
-            <input id="stop" type="number" step="any" className="input font-mono" value={v.stopPrice} onChange={(e) => set("stopPrice", e.target.value)} />
-          </Field>
-          <Field label="Cible" htmlFor="tgt">
-            <input id="tgt" type="number" step="any" className="input font-mono" value={v.targetPrice} onChange={(e) => set("targetPrice", e.target.value)} />
-          </Field>
-        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Résultat">
             <Segmented
@@ -374,17 +370,167 @@ export function TradeForm({
         </div>
       </section>
 
-      {/* ── Discipline & psycho ── */}
-      <section className="panel space-y-4 p-5">
-        <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-ink-soft">
-          Discipline &amp; psychologie
-        </h2>
+      {/* ── Contexte & setup — 2 zones + prix ── */}
+      <Collapsible
+        title="Contexte & setup"
+        action={
+          mode === "create" && hasLastContext ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                applyLastContext();
+              }}
+              className="text-xs font-medium text-accent hover:underline"
+            >
+              Reprendre le dernier contexte
+            </button>
+          ) : undefined
+        }
+      >
+        {/* ── Champs HTF (modèle 2-imbalances) ── */}
+        {!isIb && (
+          <>
+            <Field label="Biais HTF — le draw (où le prix veut livrer)" htmlFor="bias" error={errors.htfBias}>
+              <input
+                id="bias"
+                className="input"
+                placeholder="ex: livraison vers H4 sell-side 11700"
+                value={v.htfBias}
+                onChange={(e) => set("htfBias", e.target.value)}
+              />
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Imbalance d'entrée" htmlFor="ein" error={errors.entryPoi}>
+                <input
+                  id="ein"
+                  className="input"
+                  placeholder="H1 11835-11858"
+                  value={v.entryPoi}
+                  onChange={(e) => set("entryPoi", e.target.value)}
+                />
+              </Field>
+              <Field label="Zone cible (opposée)" htmlFor="cib" error={errors.targetZone}>
+                <input
+                  id="cib"
+                  className="input"
+                  placeholder="H4 11700-11720"
+                  value={v.targetZone}
+                  onChange={(e) => set("targetZone", e.target.value)}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Taille de l'imbalance">
+                <Segmented
+                  name="poiSize"
+                  value={v.poiSize}
+                  onChange={(val) => set("poiSize", val)}
+                  options={POI_SIZES.map((s) => ({ value: s, label: LABELS.poiSize[s] }))}
+                />
+              </Field>
+              <Field label="Qualité de la réaction">
+                <Segmented
+                  name="reactionQuality"
+                  value={v.reactionQuality}
+                  onChange={(val) => set("reactionQuality", val)}
+                  options={[
+                    { value: "CLEAN", label: "Clean", tone: "win" },
+                    { value: "WEAK", label: "Faible", tone: "be" },
+                    { value: "FORCED", label: "Forcée", tone: "loss" },
+                  ]}
+                />
+              </Field>
+            </div>
+            <Toggle
+              name="noWick"
+              checked={v.noWick}
+              onChange={(val) => set("noWick", val)}
+              label="Bougie sans mèche"
+              description="No-wick dans le sens du trade"
+            />
+          </>
+        )}
+
+        {/* ── Champs IB (Initial Balance) ── */}
+        {isIb && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Session IB" error={errors.ibSession}>
+                <Segmented
+                  name="ibSession"
+                  value={v.ibSession}
+                  onChange={(val) => set("ibSession", val)}
+                  options={IB_SESSIONS.map((s) => ({ value: s, label: LABELS.ibSession[s] }))}
+                />
+              </Field>
+              <Field label="Biais de l'IB" error={errors.ibDirection}>
+                <Segmented
+                  name="ibDirection"
+                  value={v.ibDirection}
+                  onChange={(val) => set("ibDirection", val)}
+                  options={[
+                    { value: "BULLISH", label: "Haussier", tone: "win" },
+                    { value: "BEARISH", label: "Baissier", tone: "loss" },
+                  ]}
+                />
+              </Field>
+            </div>
+            <Field label="Timing d'entrée" error={errors.ibEntryTiming}>
+              <Segmented
+                name="ibEntryTiming"
+                value={v.ibEntryTiming}
+                onChange={(val) => set("ibEntryTiming", val)}
+                options={[
+                  { value: "BEFORE_IB_CLOSE", label: "Avant la fin de l'IB" },
+                  { value: "AFTER_IB_CLOSE", label: "Après clôture de l'IB" },
+                ]}
+              />
+            </Field>
+            <Field label="Entrée sur FVG" hint="au cas par cas">
+              <Segmented
+                name="ibFvg"
+                value={v.ibFvg}
+                onChange={(val) => set("ibFvg", val)}
+                options={IB_FVGS.map((f) => ({ value: f, label: LABELS.ibFvg[f] }))}
+              />
+            </Field>
+          </>
+        )}
+
+        <div className="border-t border-border-soft pt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="label">Exécution (prix)</span>
+            <div className="chip">
+              RR planifié
+              <span className="font-mono font-semibold text-accent">
+                {rrPlanned != null ? `${rrPlanned.toFixed(2)}` : "—"}
+              </span>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Entrée" htmlFor="entry">
+              <input id="entry" type="number" step="any" className="input font-mono" value={v.entryPrice} onChange={(e) => set("entryPrice", e.target.value)} />
+            </Field>
+            <Field label="Stop" htmlFor="stop">
+              <input id="stop" type="number" step="any" className="input font-mono" value={v.stopPrice} onChange={(e) => set("stopPrice", e.target.value)} />
+            </Field>
+            <Field label="Cible" htmlFor="tgt">
+              <input id="tgt" type="number" step="any" className="input font-mono" value={v.targetPrice} onChange={(e) => set("targetPrice", e.target.value)} />
+            </Field>
+          </div>
+        </div>
+      </Collapsible>
+
+      {/* ── Discipline & psycho — repliée par défaut, pas indispensable à chaque trade ── */}
+      <Collapsible title="Discipline & psychologie" defaultOpen={false}>
         <Toggle
           name="followedPlan"
           checked={v.followedPlan}
           onChange={(val) => set("followedPlan", val)}
           label="Checklist respectée"
-          description="Les 8 points étaient cochés"
+          description="Les points étaient cochés"
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Sentiment AVANT">
@@ -445,10 +591,10 @@ export function TradeForm({
             />
           )}
         </Field>
-      </section>
+      </Collapsible>
 
       <div className="sticky bottom-20 z-10 flex gap-3 md:bottom-4">
-        <button type="submit" className="btn-primary flex-1" disabled={pending}>
+        <button id="trade-form-submit" type="submit" className="btn-primary flex-1" disabled={pending}>
           {pending ? "Enregistrement…" : mode === "edit" ? "Mettre à jour" : "Enregistrer le trade"}
         </button>
         <button

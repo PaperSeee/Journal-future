@@ -13,13 +13,18 @@ export interface TradeRow {
   date: string; // ISO
   instrument: string;
   direction: string;
+  strategy: string;
   session: string | null;
-  entryPoiType: string;
-  poiSize: string;
-  entryPoi: string;
-  targetZone: string;
-  reactionQuality: string;
+  entryPoiType: string | null;
+  poiSize: string | null;
+  entryPoi: string | null;
+  targetZone: string | null;
+  reactionQuality: string | null;
   noWick: boolean;
+  ibSession: string | null;
+  ibDirection: string | null;
+  ibEntryTiming: string | null;
+  ibFvg: string | null;
   result: string;
   rRealized: number | null;
   rrPlanned: number | null;
@@ -91,7 +96,7 @@ export function TradeList({ trades }: { trades: TradeRow[] }) {
                 <th className="px-4 py-3 font-medium">Inst.</th>
                 <th className="px-4 py-3 font-medium">Dir.</th>
                 <th className="px-4 py-3 font-medium">Session</th>
-                <th className="px-4 py-3 font-medium">POI</th>
+                <th className="px-4 py-3 font-medium">Imbalance</th>
                 <th className="px-4 py-3 font-medium">Réaction</th>
                 <th className="px-4 py-3 text-right font-medium">RR plan</th>
                 <th className="px-4 py-3 text-center font-medium">Rés.</th>
@@ -118,9 +123,9 @@ export function TradeList({ trades }: { trades: TradeRow[] }) {
                   <td className="max-w-[180px] px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <span className="chip !px-2 !py-0.5">
-                        {LABELS.poiType[t.entryPoiType as keyof typeof LABELS.poiType]}
+                        {LABELS.poiSize[t.poiSize as keyof typeof LABELS.poiSize]}
                       </span>
-                      <span className="text-xs text-ink-dim">{LABELS.poiSize[t.poiSize as keyof typeof LABELS.poiSize]}</span>
+                      <span className="max-w-[110px] truncate font-mono text-xs text-ink-dim">{t.entryPoi}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-ink-soft">
@@ -171,7 +176,6 @@ export function TradeList({ trades }: { trades: TradeRow[] }) {
               {t.rrPlanned != null && <span>· RR {t.rrPlanned.toFixed(2)}</span>}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="chip !px-2 !py-0.5">{LABELS.poiType[t.entryPoiType as keyof typeof LABELS.poiType]}</span>
               <span className="chip !px-2 !py-0.5">{LABELS.poiSize[t.poiSize as keyof typeof LABELS.poiSize]}</span>
               <span className="chip !px-2 !py-0.5">{LABELS.reaction[t.reactionQuality as keyof typeof LABELS.reaction]}</span>
               {t.noWick && <span className="chip !px-2 !py-0.5 !text-accent">no-wick</span>}
